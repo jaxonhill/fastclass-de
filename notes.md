@@ -8,3 +8,8 @@
 
 ### TODO / REMEMBER:
 - [ ] Make a special requirement for requirements that only have text and no actual class options under the requirement. For instance, the GWAR requirement just says to "Check the University Catalog." This must be accounted for -- even beyond the GWAR and just implemented as a broad feature.
+
+* "In Progress" requirements still might need more classes. If you are taking an Art class for a requirement, but you still have to take a Humanities class to fulfill the full requirement. It might show "In Progress" for the overall "main" requirement. Need to check this.
+* Formatting is incredibly weird for certain classes. A label such as "Piano" will be labeled as a "subrequirement" but it will have no classes attached to the actual div. The two classes might be two separate divs completely below this. 
+* For certain pre requirements, you have to check the "subreqPretext" to ensure that the requirement does not have a checkmark.
+* Another option is always just letting people paste in their degree evaluation and then analyzing which general education classes they do not have done yet in a more manual way. They could just fill in major things on their own or something.
