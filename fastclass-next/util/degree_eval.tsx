@@ -103,7 +103,7 @@ export default function runScrapeEvaluation(
 	// Create fake data to test UI
 	return [
 		{
-			title: "*** IIA. FOUNDATIONS | NATURAL SCIENCES AND QUANTITATIVE REASONING ***",
+			title: "*** IIA. FOUNDATIONS - NATURAL SCIENCES AND QUANTITATIVE REASONING ***",
 			subrequirements: [
 				{
 					title: "1. Physical Sciences",
