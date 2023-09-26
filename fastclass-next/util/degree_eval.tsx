@@ -8,9 +8,8 @@ const MAIN_REQUIREMENT_TITLE_TEXT_SELECTOR: string =
 const SUBREQUIREMENT_DIV_SELECTOR: string = ".subrequirement";
 
 // Types
-type MainRequirement = {
+export type MainRequirement = {
 	title: String;
-	status: Status;
 	subrequirements: SubRequirement[];
 };
 
@@ -39,7 +38,9 @@ type Status = "Complete" | "In Progress" | "Not Met" | "None";
 
 //
 
-export default function runScrapeEvaluation(htmlContent: string) {
+export default function runScrapeEvaluation(
+	htmlContent: string
+): MainRequirement[] {
 	// Load the HTML
 	const $ = cheerio.load(htmlContent);
 
@@ -98,4 +99,78 @@ export default function runScrapeEvaluation(htmlContent: string) {
 
 		console.log("#####\n\n\n\n\n");
 	});
+
+	// Create fake data to test UI
+	return [
+		{
+			title: "*** IIA. FOUNDATIONS | NATURAL SCIENCES AND QUANTITATIVE REASONING ***",
+			subrequirements: [
+				{
+					title: "1. Physical Sciences",
+					status: "Not Met",
+					needs: "NEEDS: 3 UNITS",
+					classOptions: [
+						{
+							department: "BIOL",
+							number: "101",
+						},
+						{
+							department: "GEOL",
+							number: "202",
+						},
+					],
+				},
+				{
+					title: "2. Mathematics",
+					status: "Not Met",
+					needs: "NEEDS: 1 CLASS",
+					classOptions: [
+						{
+							department: "MATH",
+							number: "150",
+						},
+						{
+							department: "MATH",
+							number: "151",
+						},
+					],
+				},
+			],
+		},
+		{
+			title: "*** IIC.  FOUNDATIONS - ARTS AND HUMANITIES ***",
+			subrequirements: [
+				{
+					title: "1. Art",
+					status: "Not Met",
+					needs: "NEEDS: 1 CLASS",
+					classOptions: [
+						{
+							department: "ART",
+							number: "104",
+						},
+						{
+							department: "MUSIC",
+							number: "151",
+						},
+					],
+				},
+				{
+					title: "2. Humanities",
+					status: "Not Met",
+					needs: "NEEDS: 1 CLASS",
+					classOptions: [
+						{
+							department: "ANTH",
+							number: "102",
+						},
+						{
+							department: "HIST",
+							number: "180",
+						},
+					],
+				},
+			],
+		},
+	];
 }
