@@ -7,6 +7,38 @@ const MAIN_REQUIREMENT_TITLE_TEXT_SELECTOR: string =
 	"div.reqHeaderTable > div.reqText > div.reqTitle";
 const SUBREQUIREMENT_DIV_SELECTOR: string = ".subrequirement";
 
+// Types
+type MainRequirement = {
+	title: String;
+	status: Status;
+	subrequirements: SubRequirement[];
+};
+
+type SubRequirement = {
+	title: String;
+	status: Status;
+	needs: String;
+	classOptions: (Class | ClassChoice | ClassRange)[];
+};
+
+type Class = {
+	department: String;
+	number: String; // NOTE: This could have a letter attached to it, such as 101A -- so must be string
+};
+
+type ClassChoice = {
+	choices: Class[]; // There could be a choice between more than 2 classes, so keep as an array
+};
+
+type ClassRange = {
+	startClass: Class;
+	endClass: Class;
+};
+
+type Status = "Complete" | "In Progress" | "Not Met" | "None";
+
+//
+
 export default function runScrapeEvaluation(htmlContent: string) {
 	// Load the HTML
 	const $ = cheerio.load(htmlContent);
@@ -19,26 +51,28 @@ export default function runScrapeEvaluation(htmlContent: string) {
 		UNFULFILLED_REQUIREMENT_CLASS_SELECTOR
 	);
 
-	// Go through each main requirement and get the title (replace <br> tags with " | ")
+	// Go through each main requirement
 	unfulfilledMainRequirementsDivs.each((i, div) => {
+		// Get the main requirement title (replace <br> tags with " | ")
 		const mainRequirementTitle = $(div)
 			.find(MAIN_REQUIREMENT_TITLE_TEXT_SELECTOR)
 			.html()!
 			.replace(/<br\s*\/?>/g, " | ");
 
 		console.log(mainRequirementTitle);
+		console.log("\n");
 
-		// For each main requirement, get all the subrequirements that are incomplete
-		let subrequirementDivs = $(div)
+		// For each main requirement, get subrequirements
+		let validSubrequirementDivs = $(div)
 			.find(`div${SUBREQUIREMENT_DIV_SELECTOR}`)
-			.has("div.subreqPretext > span.Status_NO");
+			.has("div.subreqPretext > span.Status_NO") // That are incomplete
+			.has("table.selectcourses td.fromcourselist tbody"); // And have classes to choose from
 
 		// Loop through each subrequirement
-		subrequirementDivs.each((j, div) => {
+		validSubrequirementDivs.each((j, div) => {
 			// Get the title of the subrequirement
 			const subrequirementTitle: string | undefined =
 				$(div).attr("pseudo");
-			console.log(subrequirementTitle);
 
 			// Get what the student "needs" to fulfill the requirement
 			const subrequirementNeeds: string | undefined = $(div)
@@ -47,12 +81,21 @@ export default function runScrapeEvaluation(htmlContent: string) {
 				.split(/\s+/) // Fix weird formatting
 				.filter(Boolean)
 				.join(" ");
-			console.log(subrequirementNeeds);
-			console.log(" ");
+
+			// Find the tableBody that has the rows of classes
+			const tableBody = $(div).find(
+				"table.selectcourses td.fromcourselist tbody"
+			);
+
+			// Find the td elements that hold the spans of classes
+			const tableDatas = $(tableBody).find("td");
+
+			// Loop through each td element that holds multiple spans of classes
+			console.log(tableDatas);
+
+			// TODO: Remove "+" from class numbers
 		});
 
-		console.log(" ");
-		console.log("##########");
-		console.log(" ");
+		console.log("#####\n\n\n\n\n");
 	});
 }

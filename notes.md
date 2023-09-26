@@ -13,3 +13,6 @@
 * Formatting is incredibly weird for certain classes. A label such as "Piano" will be labeled as a "subrequirement" but it will have no classes attached to the actual div. The two classes might be two separate divs completely below this. 
 * For certain pre requirements, you have to check the "subreqPretext" to ensure that the requirement does not have a checkmark.
 * Another option is always just letting people paste in their degree evaluation and then analyzing which general education classes they do not have done yet in a more manual way. They could just fill in major things on their own or something.
+
+
+* There needs to be a "range" filter option for class numbers. For instance, on an art requirement degree evaluation, it says that to meet an elective you can take any class from ART 300 to 599...
