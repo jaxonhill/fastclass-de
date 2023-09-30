@@ -2,3 +2,4 @@
 .env/
 test.html
 html_samples/**
+.vscode
