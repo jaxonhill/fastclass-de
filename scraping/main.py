@@ -12,8 +12,143 @@ ARIA_LABEL_ATTRIBUTE_TEXT_FOR_OPEN_CLASSES_BUTTON: str = (
     "Remove Open Classes Only filter"
 )
 
-# NOTE: CHANGE THIS WHEN SCRAPING FOR A DIFFERENT SEMESTER
+# NOTE: CHANGE/UPDATE THESE WHEN SCRAPING FOR A DIFFERENT SEMESTER
 CURRENT_SEMESTER_CODE: str = FALL_2023_SEMESTER_CODE
+SPRING_2024_SUBJECT_CODES: list[str] = [
+    "A E",
+    "A S",
+    "ACCTG",
+    "AFRAS",
+    "AMIND",
+    "ANTH",
+    "ARAB",
+    "ARP",
+]
+
+# TODO: THIS HAS THE REAL SUBJECT CODES, COPY AND PASTE TO SPRING 2024 ONCE DONE WITH TESTING
+PLACEHOLDER: list[str] = [
+    "A E",
+    "A S",
+    "ACCTG",
+    "AFRAS",
+    "AMIND",
+    "ANTH",
+    "ARAB",
+    "ARP",
+    "ART",
+    "ASIAN",
+    "ASTR",
+    "AUD",
+    "B A",
+    "BDA",
+    "BIOL",
+    "BIOMI",
+    "BQS",
+    "BRAZ",
+    "C P",
+    "CAL",
+    "CCS",
+    "CFD",
+    "CHEM",
+    "CHIN",
+    "CINTS",
+    "CIV E",
+    "CJ",
+    "CLASS",
+    "COMM",
+    "COMP",
+    "COMPE",
+    "CON E",
+    "CS",
+    "CSP",
+    "DANCE",
+    "DLE",
+    "DPT",
+    "E E",
+    "ECL",
+    "ECON",
+    "ED",
+    "EDL",
+    "ENGR",
+    "ENS",
+    "ENV E",
+    "ENV S",
+    "EUROP",
+    "FILIP",
+    "FIN",
+    "FRENC",
+    "GEN S",
+    "GEOG",
+    "GEOL",
+    "GERMN",
+    "GERO",
+    "H SEC",
+    "HEBRW",
+    "HHS",
+    "HIST",
+    "HONOR",
+    "HTM",
+    "HUM",
+    "I B",
+    "INT S",
+    "ISCOR",
+    "ITAL",
+    "JAPAN",
+    "JMS",
+    "JS",
+    "KOR",
+    "LATAM",
+    "LCS",
+    "LDT",
+    "LEAD",
+    "LGBT",
+    "LIB S",
+    "LING",
+    "M BIO",
+    "M E",
+    "M S E",
+    "MALAS",
+    "MATH",
+    "MGT",
+    "MIL S",
+    "MIS",
+    "MKTG",
+    "MTHED",
+    "MUSIC",
+    "N SCI",
+    "NAV S",
+    "NURS",
+    "NUTR",
+    "OCEAN",
+    "P A",
+    "P H",
+    "PERS",
+    "PHIL",
+    "PHYS",
+    "POL S",
+    "PORT",
+    "PSFA",
+    "PSY",
+    "R A",
+    "REL S",
+    "RTM",
+    "RUSSN",
+    "RWS",
+    "SCI",
+    "SLHS",
+    "SOC",
+    "SOCSI",
+    "SPAN",
+    "SPED",
+    "STAT",
+    "STS",
+    "SUSTN",
+    "SWORK",
+    "TE",
+    "TFM",
+    "THEA",
+    "WMNST",
+]
 
 
 def main() -> None:
@@ -24,6 +159,57 @@ def main() -> None:
         TS0193b50d,
         TS01efa3ea,
     ) = get_needed_cookie_values()
+
+    ###
+
+    # START LOOP THROUGH SUBJECT CODES
+
+    # TODO: Make Subject request
+    # TODO: Make "Remove Open Classes" request
+
+    # TODO: Check that the page loaded correctly somehow
+
+    # TODO: Check that there is no red font (indicating > 75 classes on the page currently)
+    # NOTE: Probably best to use recursion and some kind of method here actually
+    #
+    #       If there is red font, then create first iteration of class number
+    #           For instance, search "ENS 0" "ENS 1" "ENS 2"
+    #
+    #           On each one of these numbered requests, again check > 75 classes on page
+    #           If there is red font again, then further refine that specific number
+    #               For instance, "ENS 10" "ENS 11" "ENS 12"
+    #
+    #               On each one of those further numbered requests, again check > 75 classes on page
+    #               If there is the red font yet again, then again further refine the number
+    #                   For instance, "ENS 110" "ENS 111" "ENS 112"
+
+    # TODO: Once there is no red font and there are class options there:
+    #           Scrape the "ul" that holds the course options
+    #           Each "li" in the "ul" will have a onclick="javascript:openSrchRsltURL('URL YOU NEED HERE')"
+    #           Append each of those URLs to an array that is the value of a dictionary where the key is the subject code
+
+    # END LOOP
+
+    # START LOOP THROUGH SUBJECT DICTIONARY WITH THE ARRAY URL VALUES
+
+    # TODO: Make "Course ID" request
+
+    # TODO: Check that the page loaded correctly somehow
+
+    # TODO: Check if there is a "Display n More" button
+    #
+    #       If there is a "Display n More" button, then make the "Display n More" request
+    #       Check again for the button, if there is the button, then make request again, etc.
+
+    # TODO: Once all classes are in the HTML:
+    #           Scrape the table that holds all class options
+    #           Each "tr" has certain "td"s that you want such as DAYS_TIMES, INSTRUCTOR, etc.
+
+    #
+
+    # END LOOP
+
+    ###
 
     extension: str = "BIOL"
 
@@ -154,10 +340,6 @@ def main() -> None:
         print("Worked!")
 
     # TODO: CHECK DIFFERENCE IN CLASSES
-
-    # print(soup1.prettify())
-    # print("\n\n\n#####\n#####\n#####\n\n\n")
-    # print(soup2.prettify())
 
     print("FIRST HTML: " + soup1.select_one("#win0divPTS_SRCHED_KW_GB2").text)
     print("\n")
