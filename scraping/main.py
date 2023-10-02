@@ -1,6 +1,10 @@
 # Imports
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
+from dataclasses import dataclass
+import pprint
+import lxml
+import re
 import time
 
 # Constants
@@ -150,6 +154,13 @@ PLACEHOLDER: list[str] = [
 ]
 
 
+@dataclass
+class CourseOptionInfo:
+    course_name: str
+    course_id: str
+    class_number: str
+
+
 def main() -> None:
     (  # Get cookies unique to each session, they are needed for each request
         CSDPRD_PSJSESSIONID,
@@ -158,6 +169,12 @@ def main() -> None:
         TS0193b50d,
         TS01efa3ea,
     ) = get_needed_cookie_values()
+
+    # Create dictionary to track subject -> course id and class number lists
+    subject_course_options_dict = {}
+
+    # ICStateNum increase by 2 every time around loop
+    IC_State_Num: int = 2
 
     for subject_code in SPRING_2024_SUBJECT_CODES:
         """
@@ -217,13 +234,17 @@ def main() -> None:
             headers=subject_page_request_headers,
         )
 
-        # Create params and headers for the second AJAX/XML request that closes the "Open Classes" filter
+        # TODO: Check that there are actual classes and the UL exists
+
+        # Create params and headers and make the second AJAX/XML request that closes the "Open Classes" filter
         display_all_course_options_request_params = {
             "ICAJAX": "1",
             "ICNAVTYPEDROPDOWN": "0",
             "ICType": "Panel",
             "ICElementNum": "0",
-            "ICStateNum": "2",  # NOTE: Increases by 2 every time it is clicked
+            "ICStateNum": str(
+                IC_State_Num
+            ),  # NOTE: Increases by 2 every time it is clicked
             "ICAction": "PTS_BREADCRUMB_PTS_IMG$0",
             "ICModelCancel": "0",
             "ICXPos": "0",
@@ -272,42 +293,85 @@ def main() -> None:
             "sec-ch-ua-mobile": "?0",
             "sec-ch-ua-platform": '"Linux"',
         }
-
-        # Make that second request and get the XML to make soup
-        # TODO: FIX XML WARNING
         r = requests.post(
             BASE_API_URL,
             params=display_all_course_options_request_params,
             headers=display_all_course_options_request_headers,
         )
+
+        # Make this type of AJAX request increases the ICStateNum by 2
+        IC_State_Num += 2
+
+        # Create soup from the returned XML
         all_classes_request_xml: str = r.text
-        soup = BeautifulSoup(all_classes_request_xml, "html.parser")
+        soup = BeautifulSoup(all_classes_request_xml, "lxml")
 
-        # ele = soup.select_one("#win0divPTS_SEARCHED_KW2")
-        # print(ele.text)
+        # TODO: Check that there is no red font (indicating > 75 classes on the page currently)
+        # NOTE: Probably best to use recursion and some kind of method here actually
+        #
+        #       If there is red font, then create first iteration of class number
+        #           For instance, search "ENS 0" "ENS 1" "ENS 2"
+        #
+        #           On each one of these numbered requests, again check > 75 classes on page
+        #           If there is red font again, then further refine that specific number
+        #               For instance, "ENS 10" "ENS 11" "ENS 12"
+        #
+        #               On each one of those further numbered requests, again check > 75 classes on page
+        #               If there is the red font yet again, then again further refine the number
+        #                   For instance, "ENS 110" "ENS 111" "ENS 112"
 
-        return
+        # Get all the course options
+        course_option_li_elements: list[Tag] = soup.find_all(
+            "li", {"class": SUBJECT_COURSE_LI_TAG_CLASS}
+        )
 
-    # TODO: Check that there is no red font (indicating > 75 classes on the page currently)
-    # NOTE: Probably best to use recursion and some kind of method here actually
-    #
-    #       If there is red font, then create first iteration of class number
-    #           For instance, search "ENS 0" "ENS 1" "ENS 2"
-    #
-    #           On each one of these numbered requests, again check > 75 classes on page
-    #           If there is red font again, then further refine that specific number
-    #               For instance, "ENS 10" "ENS 11" "ENS 12"
-    #
-    #               On each one of those further numbered requests, again check > 75 classes on page
-    #               If there is the red font yet again, then again further refine the number
-    #                   For instance, "ENS 110" "ENS 111" "ENS 112"
+        # Define regex pattern to match course option a tag href
+        course_option_href_pattern = re.compile(
+            r"javascript:openSrchRsltURL\('([^']+)'\)"
+        )
 
-    # TODO: Once there is no red font and there are class options there:
-    #           Scrape the "ul" that holds the course options
-    #           Each "li" in the "ul" will have a onclick="javascript:openSrchRsltURL('URL YOU NEED HERE')"
-    #           Append each of those URLs to an array that is the value of a dictionary where the key is the subject code
+        # Define regex pattern to get Course ID and Class Number from href
+        course_id_class_number_href_pattern = re.compile(
+            r"CRSE_ID=([0-9]+)&.*CLASS_NBR=([0-9]+)"
+        )
+
+        # Create an empty list that will be filled with course options
+        course_options: list[CourseOptionInfo] = []
+
+        # Loop through all course option li elements
+        for course_option_li in course_option_li_elements:
+            # Get the subject / number combo of the course (ex. ECON 101)
+            course_name = course_option_li.find("p", hidden=True).text.strip()
+            print(course_name)
+
+            # Get anchor tag with href matching pattern
+            course_option_anchor_tag: Tag = course_option_li.find(
+                "a", href=course_option_href_pattern
+            )
+            course_option_href: str = course_option_anchor_tag["href"]
+
+            # Get Course ID and Class Number from a tag href
+            match = re.search(course_id_class_number_href_pattern, course_option_href)
+            if match:
+                course_id = match.group(1)
+                class_number = match.group(2)
+
+            # Append current course option to the total list for the entire subject
+            course_options.append(
+                {
+                    "course_name": course_name,
+                    "course_id": course_id,
+                    "class_number": class_number,
+                }
+            )
+
+        # Append to the subject course options dictonary
+        subject_course_options_dict[subject_code] = course_options
 
     # END LOOP
+
+    # NOTE: Print out the final dictionary for testing
+    pprint.pprint(subject_course_options_dict)
 
     # START LOOP THROUGH SUBJECT DICTIONARY WITH THE ARRAY URL VALUES
 
