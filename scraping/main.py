@@ -17,16 +17,15 @@ SUBJECT_COURSE_LI_TAG_CLASS: str = "psc_rowact"
 # NOTE: CHANGE/UPDATE THESE WHEN SCRAPING FOR A DIFFERENT SEMESTER
 CURRENT_SEMESTER_CODE: str = FALL_2023_SEMESTER_CODE
 SPRING_2024_SUBJECT_CODES: list[str] = [
-    "ENS",
-    "ECON",
+    "ART",
     "A E",
     "A S",
-    "ACCTG",
-    "AFRAS",
-    "AMIND",
-    "ANTH",
-    "ARAB",
-    "ARP",
+    # "ACCTG",
+    # "AFRAS",
+    # "AMIND",
+    # "ANTH",
+    # "ARAB",
+    # "ARP",
 ]
 
 # TODO: THIS HAS THE REAL SUBJECT CODES, COPY AND PASTE TO SPRING 2024 ONCE DONE WITH TESTING
@@ -164,7 +163,7 @@ class SDSUScraper:
         self.TS0193b50d: str = None
         self.TS01efa3ea: str = None
         # ICStateNum will frequently be updated on specific AJAX requests
-        self.IC_State_Num: int = 2
+        self.IC_State_Num: int = 1
         # Key: Subject Code | Value: list[{Course Name, Course ID, Class Number}]
         self.subject_course_options_dict: dict = {}
 
@@ -181,13 +180,11 @@ class SDSUScraper:
         self.TS01efa3ea = cookies["TS01efa3ea"]
 
     def get_subject_and_course_options(self) -> None:
-        print("HERE!")
         for subject_code in SPRING_2024_SUBJECT_CODES:
-            print(subject_code)
             # Get course options for current subject and set them as the value in stored dict
             course_options = self.__get_course_options_for_subject(subject_code)
             self.subject_course_options_dict[subject_code] = course_options
-            break
+        pprint.pprint(self.subject_course_options_dict)
 
     def __get_course_options_for_subject(
         self, subject_code: str, course_number: str = ""
@@ -204,6 +201,9 @@ class SDSUScraper:
 
         To further clarify: You ALWAYS need to make the subject request first, then the second one.
         """
+
+        # TODO: Delete later
+        print(f"CURRENTLY SEARCHING: {subject_code} {course_number}")
 
         # Create the params and headers and make initial subject page request
         subject_page_request_params = {
@@ -229,6 +229,7 @@ class SDSUScraper:
             "Connection": "keep-alive",
             "Cookie": f"TS01efa3ea={self.TS01efa3ea}; TS0193b50d={self.TS0193b50d}; lcsrftoken=ILDjEucplLUuMuHwYAM5XPoDPqQXD6swi2BOQ0wCK9Q=; CSDPRD-PSJSESSIONID={self.CSDPRD_PSJSESSIONID}; PS_LASTSITE=https://cmsweb.cms.sdsu.edu/psc/CSDPRD/; ExpirePage=https://cmsweb.cms.sdsu.edu/psc/CSDPRD/; PS_TokenSite=https://cmsweb.cms.sdsu.edu/psc/CSDPRD/?CSDPRD-PSJSESSIONID; PS_LOGINLIST=https://cmsweb.cms.sdsu.edu/CSDPRD; SignOnDefault=; ps_theme=node:SA portal:EMPLOYEE theme_id:SD_DEFAULT_THEME_FLUID css:DEFAULT_THEME_FLUID css_f:SD_PT_BRAND_FLUID_TEMPLATE_857 accessibility:N macroset:SD_PT_DEFAULT_MACROSET_857 formfactor:3 piamode:2; PS_TOKEN={self.PS_TOKEN}; PS_DEVICEFEATURES=width:1920 height:1200 pixelratio:1.100000023841858 touch:0 geolocation:1 websockets:1 webworkers:1 datepicker:1 dtpicker:1 timepicker:1 dnd:1 sessionstorage:1 localstorage:1 history:1 canvas:1 svg:1 postmessage:1 hc:0 maf:0; psback=%22%22url%22%3A%22https%3A%2F%2Fcmsweb.cms.sdsu.edu%2Fpsc%2FCSDPRD%2FEMPLOYEE%2FSA%2Fc%2FSSR_STUDENT_FL.SSR_CLSRCH_MAIN_FL.GBL%3Fpage%3DSSR_CLSRCH_MAIN_FL%22%20%22label%22%3A%22Class%20Search%20and%20Enroll%22%20%22origin%22%3A%22PIA%22%20%22layout%22%3A%221%22%20%22refurl%22%3A%22https%3A%2F%2Fcmsweb.cms.sdsu.edu%2Fpsc%2FCSDPRD%2FEMPLOYEE%2FSA%22%22; PS_TOKENEXPIRE={self.PS_TOKENEXPIRE}",
             "Host": "cmsweb.cms.sdsu.edu",
+            # TODO: MAYBE CHANGE
             "Referer": "https://cmsweb.cms.sdsu.edu/psc/CSDPRD/EMPLOYEE/SA/c/SSR_STUDENT_FL.SSR_CLSRCH_MAIN_FL.GBL?ICType=Panel&ICElementNum=0&ICStateNum=3&ICResubmit=1&ICAJAX=1&",
             "Sec-Fetch-Dest": "document",
             "Sec-Fetch-Mode": "navigate",
@@ -246,12 +247,16 @@ class SDSUScraper:
             headers=subject_page_request_headers,
         )
 
+        # Requests to API increase state by 1
+        self.IC_State_Num += 1
+
         # Check that there actually are course options for this subject
         subject_page_html: str = r.text
         soup = BeautifulSoup(subject_page_html, "html.parser")
         course_option_li_elements: list[Tag] = soup.find_all(
             "li", {"class": SUBJECT_COURSE_LI_TAG_CLASS}
         )
+
         # If there are no course options on the page, return a blank list
         # otherwise the program would fail when trying to close "Open Classes" filter when it doesn't exist
         if len(course_option_li_elements) == 0:
@@ -320,14 +325,12 @@ class SDSUScraper:
             headers=display_all_course_options_request_headers,
         )
 
-        # Deleting the "Open Classes" filter increases the ICStateNum by 2
-        self.IC_State_Num += 2
+        # Requests to API increase state by 1
+        self.IC_State_Num += 1
 
         # Create soup from the returned XML
         all_classes_request_xml: str = r.text
         soup = BeautifulSoup(all_classes_request_xml, "lxml")
-        pprint.pprint(all_classes_request_xml)
-        return
 
         # Check that there is no red font (indicating > 75 classes on the page currently)
         # Probably best to use recursion and some kind of method here actually
@@ -360,7 +363,6 @@ class SDSUScraper:
                 )
                 # Append all these options to current list of course options
                 course_options += current_options
-                pprint.pprint(f"Current Options As List Grows: " + course_options)
             return course_options
         else:
             # Get all the course options
@@ -369,9 +371,7 @@ class SDSUScraper:
             )
 
             # Define regex pattern to match course option a tag href
-            course_option_href_pattern = re.compile(
-                r"javascript:openSrchRsltURL\('([^']+)'\)"
-            )
+            course_option_href_pattern = re.compile(r"javascript:openSrchRsltURL")
 
             # Define regex pattern to get Course ID and Class Number from href
             course_id_class_number_href_pattern = re.compile(
@@ -421,7 +421,7 @@ def main() -> None:
         return  # Skip rest of program while SDSU servers are under maintenance
 
     # Get the course options for each subject
-    scraper.get_subject_and_course_options()
+    subject_and_course_options: dict = scraper.get_subject_and_course_options()
 
     # START LOOP THROUGH SUBJECT DICTIONARY WITH THE ARRAY URL VALUES
 
