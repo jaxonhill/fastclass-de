@@ -10,16 +10,19 @@ import time
 # Constants
 START_URL: str = "https://cmsweb.cms.sdsu.edu/psc/CSDPRD/EMPLOYEE/SA/c/SSR_STUDENT_FL.SSR_CLSRCH_MAIN_FL.GBL/search"
 BASE_API_URL: str = "https://cmsweb.cms.sdsu.edu/psc/CSDPRD/EMPLOYEE/SA/c/SSR_STUDENT_FL.SSR_CLSRCH_ES_FL.GBL"
+CLASS_OPTION_API_URL: str = "https://cmsweb.cms.sdsu.edu/psc/CSDPRD_1/EMPLOYEE/SA/c/SSR_STUDENT_FL.SSR_CRSE_INFO_FL.GBL"
 FALL_2023_SEMESTER_CODE: str = "2237"
 SPRING_2024_SEMESTER_CODE: str = "2243"
 SUBJECT_COURSE_LI_TAG_CLASS: str = "psc_rowact"
+DISPLAY_MORE_BUTTON_A_TAG_ID: str = "SSR_CLSRCH_F_WK_SSR_CHANGE_BTN"
 
 # NOTE: CHANGE/UPDATE THESE WHEN SCRAPING FOR A DIFFERENT SEMESTER
 CURRENT_SEMESTER_CODE: str = FALL_2023_SEMESTER_CODE
 SPRING_2024_SUBJECT_CODES: list[str] = [
-    "ART",
-    "A E",
-    "A S",
+    "COMM",
+    # "A E",
+    # "A S",
+    # "ART",
     # "ACCTG",
     # "AFRAS",
     # "AMIND",
@@ -332,25 +335,9 @@ class SDSUScraper:
         all_classes_request_xml: str = r.text
         soup = BeautifulSoup(all_classes_request_xml, "lxml")
 
-        # Check that there is no red font (indicating > 75 classes on the page currently)
-        # Probably best to use recursion and some kind of method here actually
-        #
-        #       If there is red font, then create first iteration of class number
-        #           For instance, search "ENS 0" "ENS 1" "ENS 2"
-        #
-        #           On each one of these numbered requests, again check > 75 classes on page
-        #           If there is red font again, then further refine that specific number
-        #               For instance, "ENS 10" "ENS 11" "ENS 12"
-        #
-        #               On each one of those further numbered requests, again check > 75 classes on page
-        #               If there is the red font yet again, then again further refine the number
-        #                   For instance, "ENS 110" "ENS 111" "ENS 112"
-
         # List of course options that will ultimately be returned by the method
         course_options: list[dict] = []
 
-        # TODO BUG: NOT GOING TO BE <font> TAG FOR XML or something
-        # TODO: Check that this recursion actually works
         # Try to find the red font indicating that there are > 75 course options on page
         redTextElement: Tag | None = soup.find("font", {"color": "red"})
 
@@ -373,9 +360,9 @@ class SDSUScraper:
             # Define regex pattern to match course option a tag href
             course_option_href_pattern = re.compile(r"javascript:openSrchRsltURL")
 
-            # Define regex pattern to get Course ID and Class Number from href
+            # Define regex pattern to get Course ID and Class Number and Student Level from href
             course_id_class_number_href_pattern = re.compile(
-                r"CRSE_ID=([0-9]+)&.*CLASS_NBR=([0-9]+)"
+                r"CRSE_ID=([0-9]+)&.*ACAD_CAREER=([A-Z]+)&.*CLASS_NBR=([0-9]+)"
             )
 
             # Loop through all course option li elements
@@ -389,13 +376,14 @@ class SDSUScraper:
                 )
                 course_option_href: str = course_option_anchor_tag["href"]
 
-                # Get Course ID and Class Number from a tag href
+                # Get Course ID and Class Number and Student Level from a tag href
                 match = re.search(
                     course_id_class_number_href_pattern, course_option_href
                 )
                 if match:
                     course_id = match.group(1)
-                    class_number = match.group(2)
+                    student_level = match.group(2)
+                    class_number = match.group(3)
 
                 # Append current course option to the total list for the entire subject
                 course_options.append(
@@ -403,10 +391,150 @@ class SDSUScraper:
                         "course_name": course_name,
                         "course_id": course_id,
                         "class_number": class_number,
+                        "student_level": student_level,
                     }
                 )
 
             return course_options
+
+    def get_all_class_options(self) -> None:
+        # TODO: Delete later
+        i = 0
+        for (
+            subject_code,
+            course_options_list,
+        ) in self.subject_course_options_dict.items():
+            for option in course_options_list:
+                self.get_class_options_for_course(
+                    subject_code,
+                    option["course_id"],
+                    option["class_number"],
+                    option["student_level"],
+                )
+                # TODO: Delete later
+                i += 1
+                if i == 2:
+                    break
+            break
+
+    def get_class_options_for_course(
+        self, subject_code: str, course_id: str, class_number: str, student_level: str
+    ):
+        # Reset IC_State_Num to 1 for each of these requests, NO IDEA WHY
+        self.IC_State_Num = 1
+
+        print(f"{subject_code} | COURSE_ID: {course_id} | CLASS_NUMBER: {class_number}")
+
+        class_options_request_params = {
+            "Page": "SSR_CRSE_INFO_FL",
+            "Action": "U",
+            "Page": "SSR_CS_WRAP_FL",
+            "Action": "U",
+            "CRSE_ID": course_id,
+            "CRSE_OFFER_NBR": "1",
+            "STRM": CURRENT_SEMESTER_CODE,
+            "INSTITUTION": "SDCMP",
+            "ACAD_CAREER": student_level,
+            "CLASS_NBR": class_number,
+            "pts_Portal": "EMPLOYEE",
+            "pts_PortalHostNode": "SA",
+            "pts_Market": "GBL",
+            "cmd": "uninav",
+            "ICAJAX": "1",
+            "ICMDTarget": "start",
+            "ICPanelControlStyle": "pst_side1-fixed pst_panel-mode",
+        }
+        class_options_request_headers = {
+            "Accept": "*/*",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Connection": "keep-alive",
+            "Cookie": f"TS01efa3ea={self.TS01efa3ea}; TS0193b50d={self.TS0193b50d}; CSDPRD-PSJSESSIONID={self.CSDPRD_PSJSESSIONID}; PS_TokenSite=https://cmsweb.cms.sdsu.edu/psc/CSDPRD/?CSDPRD-PSJSESSIONID; PS_LOGINLIST=https://cmsweb.cms.sdsu.edu/CSDPRD; SignOnDefault=; ps_theme=node:SA portal:EMPLOYEE theme_id:SD_DEFAULT_THEME_FLUID css:DEFAULT_THEME_FLUID css_f:SD_PT_BRAND_FLUID_TEMPLATE_857 accessibility:N macroset:SD_PT_DEFAULT_MACROSET_857 formfactor:3 piamode:2; PS_TOKEN={self.PS_TOKEN}; PS_DEVICEFEATURES=width:1920 height:1200 pixelratio:1.100000023841858 touch:0 geolocation:1 websockets:1 webworkers:1 datepicker:1 dtpicker:1 timepicker:1 dnd:1 sessionstorage:1 localstorage:1 history:1 canvas:1 svg:1 postmessage:1 hc:0 maf:0; ExpirePage=https://cmsweb.cms.sdsu.edu/psp/CSDPRD/; PS_TOKENEXPIRE={self.PS_TOKENEXPIRE}; PS_LASTSITE=https://cmsweb.cms.sdsu.edu/psp/CSDPRD/; psback=%22%22url%22%3A%22https%3A%2F%2Fcmsweb.cms.sdsu.edu%2Fpsc%2FCSDPRD_1%2FEMPLOYEE%2FSA%2Fc%2FSSR_STUDENT_FL.SSR_MD_SP_FL.GBL%3Fpage%3DSSR_MD_TGT_PAGE_FL%22%20%22label%22%3A%22Manage%20Classes%22%20%22origin%22%3A%22PIA%22%20%22layout%22%3A%221%22%20%22refurl%22%3A%22https%3A%2F%2Fcmsweb.cms.sdsu.edu%2Fpsc%2FCSDPRD_1%2FEMPLOYEE%2FSA%22%22",
+            "Host": "cmsweb.cms.sdsu.edu",
+            "Referer": f"https://cmsweb.cms.sdsu.edu/psc/CSDPRD_1/EMPLOYEE/SA/c/SSR_STUDENT_FL.SSR_MD_SP_FL.GBL?Action=U&MD=Y&GMenu=SSR_STUDENT_FL&GComp=SSR_START_PAGE_FL&GPage=SSR_START_PAGE_FL&scname=CS_SSR_MANAGE_CLASSES_NAV&Page=SSR_CS_WRAP_FL&Action=U&CRSE_ID={course_id}&CRSE_OFFER_NBR=1&STRM={CURRENT_SEMESTER_CODE}&INSTITUTION=SDCMP&ACAD_CAREER={student_level}&CLASS_NBR={class_number}&pts_Portal=EMPLOYEE&pts_PortalHostNode=SA&pts_Market=GBL&cmd=uninav",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
+            "sec-ch-ua": '"Google Chrome";v="117", "Not;A=Brand";v="8", "Chromium";v="117"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"Linux"',
+        }
+        r = requests.get(
+            CLASS_OPTION_API_URL,
+            params=class_options_request_params,
+            headers=class_options_request_headers,
+        )
+
+        # Create soup from the returned XML
+        class_options_xml: str = r.text
+        soup = BeautifulSoup(class_options_xml, "lxml")
+
+        display_more_button_element = soup.find(
+            "a", {"id": DISPLAY_MORE_BUTTON_A_TAG_ID}
+        )
+
+        # While the display more button is still there, run requests until gone
+        while display_more_button_element:
+            display_more_request_params = {
+                "ICAJAX": "1",
+                "ICNAVTYPEDROPDOWN": "0",
+                "ICType": "Panel",
+                "ICElementNum": "1",
+                "ICStateNum": "1",  # NOTE: Might have to change
+                "ICAction": "SSR_CLSRCH_F_WK_SSR_CHANGE_BTN",
+                "ICModelCancel": "0",
+                "ICXPos": "0",
+                "ICYPos": "0",
+                "ResponsetoDiffFrame": "-1",
+                "TargetFrameName": "None",
+                "FacetPath": "None",
+                "ICFocus": "",
+                "ICSaveWarningFilter": "0",
+                "ICChanged": "0",
+                "ICSkipPending": "0",
+                "ICAutoSave": "0",
+                "ICResubmit": "0",
+                "ICSID": "e/22+v1w2mzEg4CT+3ZuY4Bjjc/Y0G2XJ3dmaEqV7Ck=",
+                "ICActionPrompt": "false",
+                "ICBcDomData": f"C~UnknownValue~EMPLOYEE~SA~SSR_STUDENT_FL.SSR_CLSRCH_MAIN_FL.GBL~SSR_TERM_STA2_FL~Select a Value~UnknownValue~UnknownValue~https://cmsweb.cms.sdsu.edu/psc/CSDPRD/EMPLOYEE/SA/c/SSR_STUDENT_FL.SSR_CLSRCH_MAIN_FL.GBL?~UnknownValue*C~UnknownValue~EMPLOYEE~SA~SSR_STUDENT_FL.SSR_CLSRCH_ES_FL.GBL~SSR_CLSRCH_ES_FL~Class Search Results~UnknownValue~UnknownValue~https://cmsweb.cms.sdsu.edu/psc/CSDPRD/EMPLOYEE/SA/c/SSR_STUDENT_FL.SSR_CLSRCH_ES_FL.GBL?SEARCH_GROUP=SSR_CLASS_SEARCH_LFF&SEARCH_TEXT=%&ES_INST=SDCMP&ES_STRM={CURRENT_SEMESTER_CODE}&ES_ADV=Y&ES_SUB={subject_code}&ES_CNBR=&ES_LNAME=&KeywordsOP=CT&SubjectOP=EQ&CatalogNbrOP=CT&LastNameOP=CT&GBLSRCH=PTSF_GBLSRCH_FLUID&SEARCH_TYPE=SEARCHAGAIN~UnknownValue*C~UnknownValue~EMPLOYEE~SA~SSR_STUDENT_FL.SSR_MD_SP_FL.GBL~SSR_MD_TGT_PAGE_FL~Manage Classes~UnknownValue~UnknownValue~https://cmsweb.cms.sdsu.edu/psc/CSDPRD_1/EMPLOYEE/SA/c/SSR_STUDENT_FL.SSR_MD_SP_FL.GBL?Action=U&MD=Y&GMenu=SSR_STUDENT_FL&GComp=SSR_START_PAGE_FL&GPage=SSR_START_PAGE_FL&scname=CS_SSR_MANAGE_CLASSES_NAV&CRSE_ID={course_id}&CRSE_OFFER_NBR=1&STRM={CURRENT_SEMESTER_CODE}&INSTITUTION=SDCMP&ACAD_CAREER={student_level}&CLASS_NBR={class_number}&pts_Portal=EMPLOYEE&pts_PortalHostNode=SA&pts_Market=GBL&cmd=uninav~UnknownValue",
+                "ICDNDSrc": "",
+                "ICPanelHelpUrl": "",
+                "ICPanelName": "",
+                "ICPanelControlStyle": "pst_side1-fixed pst_panel-mode pst_side2-disabled pst_side2-hidden",
+                "ICFind": "",
+                "ICAddCount": "",
+                "ICAppClsData": "",
+            }
+            display_more_request_headers = {
+                "Accept": "*/*",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Connection": "keep-alive",
+                # "Content-Length": 1945
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Cookie": f"TS01efa3ea={self.TS01efa3ea}; TS0193b50d={self.TS0193b50d}; CSDPRD-PSJSESSIONID={self.CSDPRD_PSJSESSIONID}; PS_TokenSite=https://cmsweb.cms.sdsu.edu/psc/CSDPRD/?CSDPRD-PSJSESSIONID; PS_LOGINLIST=https://cmsweb.cms.sdsu.edu/CSDPRD; SignOnDefault=; ps_theme=node:SA portal:EMPLOYEE theme_id:SD_DEFAULT_THEME_FLUID css:DEFAULT_THEME_FLUID css_f:SD_PT_BRAND_FLUID_TEMPLATE_857 accessibility:N macroset:SD_PT_DEFAULT_MACROSET_857 formfactor:3 piamode:2; PS_TOKEN={self.PS_TOKEN}; PS_DEVICEFEATURES=width:1920 height:1200 pixelratio:1.100000023841858 touch:0 geolocation:1 websockets:1 webworkers:1 datepicker:1 dtpicker:1 timepicker:1 dnd:1 sessionstorage:1 localstorage:1 history:1 canvas:1 svg:1 postmessage:1 hc:0 maf:0; ExpirePage=https://cmsweb.cms.sdsu.edu/psp/CSDPRD/; PS_LASTSITE=https://cmsweb.cms.sdsu.edu/psp/CSDPRD/; psback=%22%22url%22%3A%22https%3A%2F%2Fcmsweb.cms.sdsu.edu%2Fpsc%2FCSDPRD_1%2FEMPLOYEE%2FSA%2Fc%2FSSR_STUDENT_FL.SSR_MD_SP_FL.GBL%3Fpage%3DSSR_MD_TGT_PAGE_FL%22%20%22label%22%3A%22Manage%20Classes%22%20%22origin%22%3A%22PIA%22%20%22layout%22%3A%221%22%20%22refurl%22%3A%22https%3A%2F%2Fcmsweb.cms.sdsu.edu%2Fpsc%2FCSDPRD_1%2FEMPLOYEE%2FSA%22%22; PS_TOKENEXPIRE={self.PS_TOKENEXPIRE}",
+                "Host": "cmsweb.cms.sdsu.edu",
+                "Origin": "https://cmsweb.cms.sdsu.edu",
+                "Referer": f"https://cmsweb.cms.sdsu.edu/psc/CSDPRD_1/EMPLOYEE/SA/c/SSR_STUDENT_FL.SSR_MD_SP_FL.GBL?Action=U&MD=Y&GMenu=SSR_STUDENT_FL&GComp=SSR_START_PAGE_FL&GPage=SSR_START_PAGE_FL&scname=CS_SSR_MANAGE_CLASSES_NAV&Page=SSR_CS_WRAP_FL&Action=U&CRSE_ID={course_id}&CRSE_OFFER_NBR=1&STRM={CURRENT_SEMESTER_CODE}&INSTITUTION=SDCMP&ACAD_CAREER={student_level}&CLASS_NBR={class_number}&pts_Portal=EMPLOYEE&pts_PortalHostNode=SA&pts_Market=GBL&cmd=uninav",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "same-origin",
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
+                "sec-ch-ua": '"Google Chrome";v="117", "Not;A=Brand";v="8", "Chromium";v="117"',
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": '"Linux"',
+            }
+            r = requests.post(
+                CLASS_OPTION_API_URL,
+                params=display_more_request_params,
+                headers=display_more_request_headers,
+            )
+            class_options_xml = r.text
+            pprint.pprint(class_options_xml)
+            soup = BeautifulSoup(class_options_xml, "lxml")
+            self.IC_State_Num += 1  # Increment IC_State_Num by 1 every time a "Display More" request is made
+            break
 
 
 def main() -> None:
@@ -421,11 +549,21 @@ def main() -> None:
         return  # Skip rest of program while SDSU servers are under maintenance
 
     # Get the course options for each subject
-    subject_and_course_options: dict = scraper.get_subject_and_course_options()
+    scraper.get_subject_and_course_options()
 
-    # START LOOP THROUGH SUBJECT DICTIONARY WITH THE ARRAY URL VALUES
+    # Get all the class options for each course option
+    scraper.get_all_class_options()
 
-    # TODO: Make "Course ID" request
+    # If "Show More" button element exists:
+    #   Make "Show More" request
+    #   If "Show More" button element exists:
+    #       Make "Show More" request
+    #       If "Show More"
+    #       Etc.
+
+    # Take final html or xml soup and get the table body
+    # Loop through each tr of the table body to get information needed
+    # Make it optional for each slot. For instance, "if not element" ->
 
     # TODO: Check that the page loaded correctly somehow
 
